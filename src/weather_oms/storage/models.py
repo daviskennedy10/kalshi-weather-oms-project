@@ -1,9 +1,20 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -14,14 +25,65 @@ class Base(DeclarativeBase):
 
 class Forecast(Base):
     __tablename__ = "forecasts"
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    station: Mapped[str] = mapped_column(String(16), index=True)
-    model_run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    valid_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
-    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    __table_args__ = (UniqueConstraint("station", "model_run_at", "valid_date"),)
 
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    station_code: Mapped[str] = mapped_column(
+        String(16),
+        index=True,
+    )
+
+    forecast_date: Mapped[date] = mapped_column(
+        Date,
+        index=True,
+    )
+
+    model_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        nullable=True,
+    )
+
+    retrieved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+    )
+
+    source_latitude: Mapped[float] = mapped_column(Float)
+    source_longitude: Mapped[float] = mapped_column(Float)
+
+    member_highs_f: Mapped[list[float]] = mapped_column(JSONB)
+
+    mean_high_f: Mapped[float] = mapped_column(Float)
+    minimum_high_f: Mapped[float] = mapped_column(Float)
+    maximum_high_f: Mapped[float] = mapped_column(Float)
+    standard_deviation_f: Mapped[float] = mapped_column(Float)
+
+    fingerprint: Mapped[str] = mapped_column(
+        String(64),
+    )
+
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "station_code",
+            "forecast_date",
+            "fingerprint",
+            name="uq_forecast_station_date_fingerprint",
+        ),
+        CheckConstraint(
+            "jsonb_array_length(member_highs_f) = 64",
+            name="ck_forecast_has_64_members",
+        ),
+    )
 
 class Order(Base):
     __tablename__ = "orders"

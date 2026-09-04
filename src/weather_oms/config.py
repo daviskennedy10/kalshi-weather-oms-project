@@ -12,7 +12,7 @@ class TradingMode(StrEnum):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://weather:weather@localhost:5432/weather_oms"
+    database_url: str = "postgresql+asyncpg://weather:weather@localhost:5433/weather_oms"
     trading_mode: TradingMode = TradingMode.PAPER
     kalshi_env: str = "demo"
     kalshi_key_id: str | None = None
