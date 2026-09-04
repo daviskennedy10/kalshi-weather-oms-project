@@ -96,12 +96,25 @@ def parse_daily_forecasts(
                 f"Invalid forecast date: {date_text!r}."
             ) from error
 
+        raw_temperatures = [
+            daily[key][date_index]
+            for key in MEMBER_KEYS
+        ]
+
+        if any(value is None for value in raw_temperatures):
+            continue
+
         temperatures: list[float] = []
 
-        for key in MEMBER_KEYS:
-            value = daily[key][date_index]
-
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
+        for key, value in zip(
+            MEMBER_KEYS,
+            raw_temperatures,
+            strict=True,
+        ):
+            if isinstance(value, bool) or not isinstance(
+                value,
+                (int, float),
+            ):
                 raise ForecastParseError(
                     f"Invalid temperature for {key!r} on {date_text!r}: {value!r}."
                 )
@@ -117,5 +130,8 @@ def parse_daily_forecasts(
                 source_longitude=float(response["longitude"]),
             )
         )
-
+    if not forecasts:
+        raise ForecastParseError(
+            "Open-Meteo response contains no complete daily forecasts."
+        )
     return forecasts

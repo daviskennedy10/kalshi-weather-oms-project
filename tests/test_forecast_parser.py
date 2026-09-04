@@ -72,3 +72,16 @@ def test_rejects_non_fahrenheit_temperatures() -> None:
         match="Expected Fahrenheit",
     ):
         parse_daily_forecasts(response, STATIONS["KNYC"])
+
+def test_skips_incomplete_forecast_date() -> None:
+    response = make_valid_response()
+
+    response["daily"]["temperature_2m_max_member63"][1] = None
+
+    forecasts = parse_daily_forecasts(
+        response,
+        STATIONS["KNYC"],
+    )
+
+    assert len(forecasts) == 1
+    assert forecasts[0].forecast_date.isoformat() == "2026-09-03"
