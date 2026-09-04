@@ -1,0 +1,84 @@
+import uuid
+from datetime import datetime
+from decimal import Decimal
+from typing import Any
+
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class Forecast(Base):
+    __tablename__ = "forecasts"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    station: Mapped[str] = mapped_column(String(16), index=True)
+    model_run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    valid_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (UniqueConstraint("station", "model_run_at", "valid_date"),)
+
+
+class Order(Base):
+    __tablename__ = "orders"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_order_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    exchange_order_id: Mapped[str | None] = mapped_column(String(128), unique=True)
+    market_ticker: Mapped[str] = mapped_column(String(128), index=True)
+    side: Mapped[str] = mapped_column(String(8))
+    price_cents: Mapped[int] = mapped_column(Integer)
+    count: Mapped[int] = mapped_column(Integer)
+    filled_count: Mapped[int] = mapped_column(Integer, default=0)
+    state: Mapped[str] = mapped_column(String(32), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Fill(Base):
+    __tablename__ = "fills"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    exchange_fill_id: Mapped[str] = mapped_column(String(128), unique=True)
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), index=True)
+    count: Mapped[int] = mapped_column(Integer)
+    price_cents: Mapped[int] = mapped_column(Integer)
+    filled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class Position(Base):
+    __tablename__ = "positions"
+    market_ticker: Mapped[str] = mapped_column(String(128), primary_key=True)
+    net_count: Mapped[int] = mapped_column(Integer, default=0)
+    cost_cents: Mapped[int] = mapped_column(Integer, default=0)
+    realized_pnl_cents: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Settlement(Base):
+    __tablename__ = "settlements"
+    market_ticker: Mapped[str] = mapped_column(String(128), primary_key=True)
+    result: Mapped[str] = mapped_column(String(8))
+    payout_cents: Mapped[int] = mapped_column(Integer)
+    settled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), index=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LatencySample(Base):
+    __tablename__ = "latency_samples"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    market_ticker: Mapped[str | None] = mapped_column(String(128), index=True)
+    stage: Mapped[str] = mapped_column(String(64))
+    elapsed_ms: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+

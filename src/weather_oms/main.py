@@ -1,0 +1,46 @@
+import asyncio
+
+import httpx
+
+from weather_oms.bus import EventBus
+from weather_oms.config import Settings
+from weather_oms.ingest.forecast_poller import ForecastPoller, WeatherNextClient
+from weather_oms.ingest.kalshi_stream import KalshiStream
+from weather_oms.stations import STATIONS
+
+
+async def serve() -> None:
+    settings = Settings()
+    bus = EventBus()
+    async with httpx.AsyncClient(timeout=20) as http:
+        poller = ForecastPoller(WeatherNextClient(http), bus, list(STATIONS.values()))
+        tasks = [asyncio.create_task(poller.run(settings.forecast_refresh_seconds))]
+        if settings.tickers and settings.kalshi_key_id and settings.kalshi_private_key_path:
+            stream = KalshiStream(
+                settings.kalshi_ws_url,
+                settings.kalshi_key_id,
+                settings.kalshi_private_key_path,
+                settings.tickers,
+                bus,
+            )
+            tasks.append(asyncio.create_task(stream.run()))
+        try:
+            while True:
+                event = await bus.next()
+                # Plumbing stops here until you implement the three core decision modules.
+                # Next milestone: dispatch event -> signal -> sizing -> persisted order intent.
+                print(event.kind, event.received_time.isoformat())
+                bus.task_done()
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+
+def run() -> None:
+    asyncio.run(serve())
+
+
+if __name__ == "__main__":
+    run()
+
