@@ -85,6 +85,62 @@ class Forecast(Base):
         ),
     )
 
+class TemperatureSettlement(Base):
+    __tablename__ = "temperature_settlements"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    series_ticker: Mapped[str] = mapped_column(
+        String(64),
+        index=True,
+    )
+
+    event_ticker: Mapped[str] = mapped_column(
+        String(128),
+        unique=True,
+        index=True,
+    )
+
+    station_code: Mapped[str] = mapped_column(
+        String(16),
+        index=True,
+    )
+
+    observation_date: Mapped[date] = mapped_column(
+        Date,
+        index=True,
+    )
+
+    temperature_f: Mapped[Decimal] = mapped_column(
+        Numeric(6, 2),
+    )
+
+    source_name: Mapped[str] = mapped_column(
+        String(128),
+    )
+
+    source_url: Mapped[str] = mapped_column(
+        String(512),
+    )
+
+    settled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+    )
+
+    retrieved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+    )
+
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    
 class Order(Base):
     __tablename__ = "orders"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

@@ -8,3 +8,6 @@ __pycache__/
 dist/
 *.pem
 central_park_forecast.json
+kalshi_series.json
+kalshi_events.json
+kalshi_settled_events.json
