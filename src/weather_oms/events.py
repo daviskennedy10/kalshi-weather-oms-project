@@ -7,8 +7,10 @@ from typing import Any
 
 class EventKind(StrEnum):
     FORECAST_UPDATED = "forecast.updated"
+    TEMPERATURE_SETTLED = "temperature.settled"
     ORDERBOOK_UPDATED = "orderbook.updated"
     FILL_RECEIVED = "fill.received"
+    
 
 
 @dataclass(frozen=True, slots=True)

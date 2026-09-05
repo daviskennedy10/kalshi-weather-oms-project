@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     kalshi_private_key_path: str | None = None
     market_tickers: str = ""
     forecast_refresh_seconds: int = Field(default=900, ge=60)
+    settlement_refresh_seconds: int = Field(
+    default=3600,
+    ge=60,
+    )
     max_order_risk_cents: int = Field(default=500, ge=1)
 
     @property
