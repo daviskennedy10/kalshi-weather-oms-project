@@ -1,13 +1,23 @@
 import hashlib
 import json
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import date, datetime
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from weather_oms.ingest.forecast_parser import DailyForecast
 from weather_oms.storage.models import Forecast
 
+
+@dataclass(frozen=True, slots=True)
+class StoredForecast:
+    station_code: str
+    forecast_date: date
+    retrieved_at: datetime
+    mean_high_f: float
+    standard_deviation_f: float
 
 def create_forecast_fingerprint(
     forecast: DailyForecast,
@@ -74,3 +84,41 @@ async def save_forecast(
     inserted_id = result.scalar_one_or_none()
 
     return inserted_id is not None
+
+async def load_latest_forecast_by_cutoff(
+    session: AsyncSession,
+    station_code: str,
+    target_date: date,
+    cutoff_at: datetime,
+) -> StoredForecast | None:
+    if cutoff_at.tzinfo is None:
+        raise ValueError(
+            "cutoff_at must include a timezone."
+        )
+
+    statement = (
+        select(Forecast)
+        .where(
+            Forecast.station_code == station_code,
+            Forecast.forecast_date == target_date,
+            Forecast.retrieved_at <= cutoff_at,
+        )
+        .order_by(Forecast.retrieved_at.desc())
+        .limit(1)
+    )
+
+    result = await session.execute(statement)
+    forecast = result.scalar_one_or_none()
+
+    if forecast is None:
+        return None
+
+    return StoredForecast(
+        station_code=forecast.station_code,
+        forecast_date=forecast.forecast_date,
+        retrieved_at=forecast.retrieved_at,
+        mean_high_f=forecast.mean_high_f,
+        standard_deviation_f=(
+            forecast.standard_deviation_f
+        ),
+    )

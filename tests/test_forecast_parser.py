@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from weather_oms.ingest.forecast_parser import (
@@ -8,8 +10,8 @@ from weather_oms.ingest.forecast_parser import (
 from weather_oms.stations import STATIONS
 
 
-def make_valid_response() -> dict:
-    daily = {
+def make_valid_response() -> dict[str, Any]:
+    daily: dict[str, Any] = {
         "time": ["2026-09-03", "2026-09-04"],
     }
 
