@@ -4,6 +4,8 @@ from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 from weather_oms.config import Settings
+from weather_oms.execution.risk import assess_risk
+from weather_oms.execution.risk_adapter import build_risk_request
 from weather_oms.signal.bias_correction import (
     apply_bias_correction,
 )
@@ -274,6 +276,8 @@ async def compare(target_date: date) -> None:
             market.bracket.upper_f,
         )
 
+        risk_decision = None
+
         if comparison.candidate_side is None:
             candidate = "None"
         else:
@@ -281,6 +285,24 @@ async def compare(target_date: date) -> None:
                 f"{comparison.candidate_side.upper()} "
                 f"({comparison.candidate_edge * 100:+.1f} pp)"
             )
+
+        risk_request = build_risk_request(
+            comparison=comparison,
+            bracket_id=market.ticker,
+            mode="paper",
+            kill_switch_active=False,
+            inputs_complete=True,
+            inputs_aligned=True,
+            forecast_eligible=True,
+            quote_eligible=True,
+            quote_fresh=True,
+            model_ready=(
+                len(stored_forecast.member_highs_f) == 64
+                and len(markets) == 6
+            ),
+        )
+
+        risk_decision = assess_risk(risk_request)
 
         print()
         print(f"Market: {market.ticker}")
@@ -338,6 +360,19 @@ async def compare(target_date: date) -> None:
         )
         print(f"Candidate: {candidate}")
 
+        if risk_decision is None:
+            print("Risk decision: NOT EVALUATED")
+        else:
+            result = "ALLOW" if risk_decision.allowed else "BLOCK"
+            print(f"Risk decision: {result}")
+            print(
+                "Proposed risk: "
+                f"${risk_decision.event_worst_case_risk_dollars:.4f}"
+            )
+
+            for reason in risk_decision.reasons:
+                print(f"Risk reason: {reason}")
+
     print(
         "Required minimum net edge: "
         f"{comparison.minimum_net_edge * 100:.1f} pp"
@@ -356,9 +391,9 @@ async def compare(target_date: date) -> None:
         f"{total_smoothed_probability:.1%}"
     )
     print(
-        "Warning: candidates are research signals only. "
-        "Fees are included, but calibration uncertainty "
-        "and full risk controls are not yet included."
+        "Warning: research and paper-risk output only. "
+        "No orders are placed. Existing positions and daily "
+        "account totals are not connected yet."
     )
 
 
