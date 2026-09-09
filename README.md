@@ -91,3 +91,60 @@ Never commit `.env` or PEM keys. Develop against Kalshi's demo environment. Enab
 execution should require an explicit code path, startup acknowledgement, hard exposure caps,
 and a kill switch—not merely changing an environment string.
 
+## Milestones
+
+Milestone 1: Collect one forecast
+Get WeatherNext data for Central Park and understand it.
+
+
+Milestone 2: Save forecasts and actual temperatures
+Store what WeatherNext predicted and what temperature actually occurred.
+This gives us the historical information needed to answer:
+How wrong was WeatherNext?
+
+
+Milestone 3: Build your bias-correction model
+Use previous forecast mistakes to improve future forecasts.
+This is one of the three core parts you will personally build.
+
+
+Milestone 4: Read one Kalshi weather market
+Receive the prices and understand exactly what the market means and how it settles.
+
+
+Milestone 5: Compare our probability with Kalshi’s price
+Determine whether a possible opportunity exists.
+Still no orders yet.
+
+
+Milestone 6: Build the Order Management System
+Design and implement:
+Order states
+Safe state changes
+Duplicate-order protection
+Checking our records against Kalshi’s records
+This is the main systems-engineering portion of the project.
+
+
+Milestone 7: Build position sizing
+Decide how much pretend money to risk.
+
+
+Milestone 8: Paper trading
+Run the full system using pretend money.
+
+
+Milestone 9: Backtesting and measurements
+Measure:
+Prediction accuracy
+Profit or loss
+How quickly the system reacts
+Whether probabilities are trustworthy
+
+
+Milestone 10: Dashboard and project presentation
+Create the part recruiters can see and prepare your:
+README
+Architecture explanation
+Resume bullet
+Interview walkthrough

@@ -16,6 +16,17 @@ class KalshiPublicClient:
         return await self._get_json(
             f"/series/{series_ticker}"
         )
+    
+    async def get_event(
+        self,
+        event_ticker: str,
+    ) -> dict[str, Any]:
+        return await self._get_json(
+            f"/events/{event_ticker}",
+            params={
+                "with_nested_markets": "true",
+            },
+        )
 
     async def get_settled_events(
         self,

@@ -16,6 +16,7 @@ class StoredForecast:
     station_code: str
     forecast_date: date
     retrieved_at: datetime
+    member_highs_f: tuple[float, ...]
     mean_high_f: float
     standard_deviation_f: float
 
@@ -117,6 +118,7 @@ async def load_latest_forecast_by_cutoff(
         station_code=forecast.station_code,
         forecast_date=forecast.forecast_date,
         retrieved_at=forecast.retrieved_at,
+        member_highs_f=tuple(forecast.member_highs_f),
         mean_high_f=forecast.mean_high_f,
         standard_deviation_f=(
             forecast.standard_deviation_f

@@ -140,7 +140,85 @@ class TemperatureSettlement(Base):
         DateTime(timezone=True),
         server_default=func.now(),
     )
-    
+
+
+class MarketQuoteSnapshot(Base):
+    __tablename__ = "market_quote_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    event_ticker: Mapped[str] = mapped_column(
+        String(128),
+        index=True,
+    )
+
+    market_ticker: Mapped[str] = mapped_column(
+        String(128),
+        index=True,
+    )
+
+    target_date: Mapped[date] = mapped_column(
+        Date,
+        index=True,
+    )
+
+    lower_f: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    upper_f: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    yes_bid_cents: Mapped[int] = mapped_column(Integer)
+    yes_ask_cents: Mapped[int] = mapped_column(Integer)
+    no_bid_cents: Mapped[int] = mapped_column(Integer)
+    no_ask_cents: Mapped[int] = mapped_column(Integer)
+
+    retrieved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+    )
+
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "market_ticker",
+            "retrieved_at",
+            name="uq_market_quote_ticker_retrieved",
+        ),
+        CheckConstraint(
+            "lower_f IS NOT NULL OR upper_f IS NOT NULL",
+            name="ck_market_quote_has_bound",
+        ),
+        CheckConstraint(
+            "yes_bid_cents BETWEEN 0 AND 100",
+            name="ck_market_quote_yes_bid",
+        ),
+        CheckConstraint(
+            "yes_ask_cents BETWEEN 0 AND 100",
+            name="ck_market_quote_yes_ask",
+        ),
+        CheckConstraint(
+            "no_bid_cents BETWEEN 0 AND 100",
+            name="ck_market_quote_no_bid",
+        ),
+        CheckConstraint(
+            "no_ask_cents BETWEEN 0 AND 100",
+            name="ck_market_quote_no_ask",
+        ),
+    )
+
 class Order(Base):
     __tablename__ = "orders"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
