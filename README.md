@@ -143,8 +143,6 @@ Whether probabilities are trustworthy
 
 
 Milestone 10: Dashboard and project presentation
-Create the part recruiters can see and prepare your:
 README
 Architecture explanation
-Resume bullet
-Interview walkthrough
+
