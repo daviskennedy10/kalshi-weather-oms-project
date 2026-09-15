@@ -21,6 +21,7 @@ def build_risk_request(
     quote_eligible: bool,
     quote_fresh: bool,
     model_ready: bool,
+    contracts: int = 1,
     existing_event_positions: tuple[PositionRisk, ...] = (),
     other_daily_exposure_dollars: Decimal = Decimal(0),
     daily_realized_loss_dollars: Decimal = Decimal(0),
@@ -40,6 +41,9 @@ def build_risk_request(
     else:
         ask_cents = comparison.no_ask_cents
         fee_dollars = comparison.no_fee_dollars
+    
+    if contracts <= 0:
+        raise ValueError("contracts must be positive")
 
     price_dollars = Decimal(ask_cents) / Decimal(100)
     fee = Decimal(str(fee_dollars))
@@ -48,7 +52,7 @@ def build_risk_request(
         market_ticker=comparison.market_ticker,
         bracket_id=bracket_id,
         side=side,
-        contracts=1,
+        contracts=contracts,
         risk_per_contract_dollars=price_dollars + fee,
     )
 

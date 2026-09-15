@@ -286,3 +286,58 @@ def test_candidate_without_bracket_is_rejected() -> None:
             candidates=(candidate,),
             portfolio=empty_portfolio(),
         )
+
+def test_candidate_contract_count_reaches_risk_engine() -> None:
+    candidate = PaperCandidate(
+        bracket_id="BRACKET-A",
+        comparison=make_comparison(
+            ticker="MARKET-A",
+            side="yes",
+            candidate_edge=0.20,
+            yes_ask_cents=40,
+        ),
+        contracts=3,
+    )
+    policy = RiskPolicy(
+        maximum_contracts_per_order=3,
+        maximum_contracts_per_market=3,
+        maximum_order_risk_dollars=Decimal("2.00"),
+        maximum_event_risk_dollars=Decimal("3.00"),
+    )
+
+    plan = plan_paper_positions(
+        candidates=(candidate,),
+        portfolio=empty_portfolio(),
+        policy=policy,
+    )
+
+    assert (
+        plan[0].risk_request.proposed_position.contracts
+        == 3
+    )
+    assert (
+        plan[0].risk_request.proposed_position.total_risk_dollars
+        == Decimal("1.20")
+    )
+    assert plan[0].risk_decision.allowed is True
+
+
+def test_nonpositive_candidate_contracts_are_rejected() -> None:
+    candidate = PaperCandidate(
+        bracket_id="BRACKET-A",
+        comparison=make_comparison(
+            ticker="MARKET-A",
+            side="yes",
+            candidate_edge=0.20,
+        ),
+        contracts=0,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="contracts must be positive",
+    ):
+        plan_paper_positions(
+            candidates=(candidate,),
+            portfolio=empty_portfolio(),
+        )

@@ -420,6 +420,14 @@ class PaperRiskDecision(Base):
         Numeric(10, 6),
     )
 
+    model_probability: Mapped[Decimal] = mapped_column(
+        Numeric(10, 6),
+    )
+
+    contracts: Mapped[int] = mapped_column(
+        Integer,
+    )
+
     allowed: Mapped[bool] = mapped_column(
         Boolean,
     )
@@ -457,6 +465,14 @@ class PaperRiskDecision(Base):
         CheckConstraint(
             "net_edge BETWEEN -1 AND 1",
             name="ck_paper_risk_decision_edge",
+        ),
+        CheckConstraint(
+            "model_probability BETWEEN 0 AND 1",
+            name="ck_paper_risk_decision_probability",
+        ),
+        CheckConstraint(
+            "contracts > 0",
+            name="ck_paper_risk_decision_contracts",
         ),
         CheckConstraint(
             "proposed_risk_dollars >= 0",

@@ -7,9 +7,11 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from weather_oms.storage.models import PaperRiskDecision
 from weather_oms.storage.paper_risk_decision_repository import (
     NewPaperRiskDecision,
     create_paper_decision_id,
+    load_paper_decision_timings,
     save_paper_risk_decision,
 )
 
@@ -32,6 +34,8 @@ def make_decision() -> NewPaperRiskDecision:
         quote_retrieved_at=QUOTE_TIME,
         side="yes",
         net_edge=Decimal("0.186"),
+        model_probability=Decimal("0.47"),
+        contracts=1,
         allowed=True,
         reasons=(),
         proposed_risk_dollars=Decimal("0.2838"),
@@ -265,3 +269,106 @@ def test_kill_switch_changes_decision_id() -> None:
     )
 
     assert switch_off != switch_on
+
+
+def make_stored_decision() -> PaperRiskDecision:
+    return PaperRiskDecision(
+        id=uuid.uuid4(),
+        decision_id="decision-stored",
+        event_ticker="KXHIGHNY-26SEP10",
+        market_ticker="KXHIGHNY-26SEP10-T85",
+        target_date=date(2026, 9, 10),
+        quote_retrieved_at=QUOTE_TIME,
+        side="yes",
+        net_edge=Decimal("0.186"),
+        model_probability=Decimal("0.47"),
+        contracts=1,
+        allowed=True,
+        reasons=[],
+        proposed_risk_dollars=Decimal("0.2838"),
+        event_risk_after_dollars=Decimal("0.2838"),
+        daily_exposure_after_dollars=Decimal("0.2838"),
+        kill_switch_active=False,
+        stored_at=QUOTE_TIME.replace(
+            minute=50,
+        ),
+    )
+
+
+def make_timing_result(
+    rows: list[PaperRiskDecision],
+) -> Mock:
+    scalars = Mock()
+    scalars.all.return_value = rows
+
+    result = Mock()
+    result.scalars.return_value = scalars
+    return result
+
+
+@pytest.mark.asyncio
+async def test_loads_paper_decision_timings() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    session.execute.return_value = make_timing_result(
+        [make_stored_decision()]
+    )
+
+    timings = await load_paper_decision_timings(
+        session=session,
+        target_date=date(2026, 9, 10),
+    )
+
+    assert len(timings) == 1
+    assert timings[0].decision_id == "decision-stored"
+    assert timings[0].quote_retrieved_at == QUOTE_TIME
+    assert timings[0].stored_at == QUOTE_TIME.replace(
+        minute=50,
+    )
+    assert timings[0].latency.total_seconds() == 60
+
+
+@pytest.mark.asyncio
+async def test_load_timings_can_return_empty() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    session.execute.return_value = make_timing_result([])
+
+    timings = await load_paper_decision_timings(
+        session=session,
+    )
+
+    assert timings == ()
+
+@pytest.mark.asyncio
+async def test_rejects_invalid_model_probability() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    decision = replace(
+        make_decision(),
+        model_probability=Decimal("1.01"),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="model_probability",
+    ):
+        await save_paper_risk_decision(
+            session=session,
+            decision=decision,
+        )
+
+
+@pytest.mark.asyncio
+async def test_rejects_nonpositive_contracts() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    decision = replace(
+        make_decision(),
+        contracts=0,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="contracts must be positive",
+    ):
+        await save_paper_risk_decision(
+            session=session,
+            decision=decision,
+        )

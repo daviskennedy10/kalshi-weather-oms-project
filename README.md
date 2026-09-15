@@ -1,148 +1,283 @@
 # Weather Kalshi OMS
 
-An event-driven, paper-first trading system for Kalshi temperature markets. It combines
-WeatherNext 2 ensemble forecasts with an order-management layer designed to make retries,
-fills, reconciliation, and latency observable.
+A safety-first weather forecasting and paper-trading system for Kalshi temperature markets.
 
-This is deliberately **not yet a trading strategy**. Three decision-heavy modules are left
-as guided exercises so the project owner can derive and defend them:
+The project collects WeatherNext 2 ensemble forecasts, converts them into market probabilities, compares those probabilities with Kalshi prices, applies risk and position-sizing rules, and records pretend trades for later evaluation.
 
-- `signal/bias_model.py`: forecast residual model
-- `oms/order_state.py` and `oms/idempotency.py`: lifecycle and retry semantics
-- `oms/sizing.py`: fractional Kelly sizing
+It does **not** place real Kalshi orders.
 
-## MVP boundary
+## Why this project exists
 
-Phase 1 proves reliable event flow in paper mode for three stations. It does not promise
-profitability or production-grade low latency. Live execution remains gated until model
-calibration, risk controls, reconciliation, and failure-injection tests are complete.
+A trading signal is only one part of a reliable system. The harder engineering problems include:
+
+- Preventing duplicate orders during retries
+- Enforcing legal order-state changes
+- Handling partial fills and uncertain submissions
+- Limiting correlated event risk
+- Reconciling local records with exchange records
+- Preventing historical data leakage
+- Measuring probability quality and system latency
+
+This project implements those controls explicitly.
+
+## Architecture
 
 ```mermaid
 flowchart TD
-    W["WeatherNext 2 adapter"] --> B["Bounded event bus"]
-    K["Kalshi WebSocket adapter"] --> B
-    B --> S["Signal and calibration"]
-    S --> O["OMS and risk"]
-    O --> P["Paper execution"]
-    P --> D["Postgres ledger and audit"]
+    W["WeatherNext 2"] --> A["Aligned snapshot"]
+    K["Kalshi markets"] --> A
+    A --> S["Probability and bias model"]
+    S --> R["Sizing and risk"]
+    R --> P["Paper ledger"]
+    P --> M["Settlement and metrics"]
+
+    O["OMS records"] --> C["Read-only reconciliation"]
+    X["Kalshi order records"] --> C
 ```
 
-## Important source-of-truth decisions
+PostgreSQL stores forecasts, quotes, settlements, risk decisions, paper positions, OMS orders, and fills.
 
-- Open-Meteo currently processes WeatherNext 2 at 00z and 12z, despite upstream model runs
-  also existing at 06z and 18z. The system polls for freshness and emits only changed data.
-- Use current Kalshi API specifications as the contract. The old `kalshi-python` SDK is
-  deprecated; the current official async package is `kalshi_python_async`. This scaffold
-  implements the WebSocket protocol directly so message handling remains explicit.
-- Kalshi temperature settlement depends on the named NWS station. Coordinates and settlement
-  rules must be verified per market before any live trading.
+## Decision pipeline
 
-## Quick start
+1. Retrieve a 64-member WeatherNext 2 ensemble forecast.
+2. Retrieve all six Kalshi temperature brackets.
+3. Require both snapshots to exist before the decision cutoff.
+4. Apply bias correction only when enough eligible historical outcomes exist.
+5. Convert ensemble members into smoothed bracket probabilities.
+6. Subtract Kalshi prices and fees to calculate net edge.
+7. Use quarter-Kelly sizing with conservative hard limits.
+8. Run the pure risk engine.
+9. Save an audit decision.
+10. Save a pretend position only when explicitly requested.
+11. Settle the position from Kalshi’s published result.
+12. Measure profit, loss, drawdown, latency, and probability quality.
 
-Requires Python 3.12 and Docker.
+## Safety controls
+
+The current system cannot submit real orders.
+
+Safety controls include:
+
+- Paper mode required by the risk engine
+- No authenticated POST or DELETE client
+- Read-only Kalshi demo credentials
+- Dry run by default
+- Explicit `--save` required for pretend positions
+- Forward-only paper-saving window
+- Kill switch
+- Minimum net-edge requirement
+- Per-order contract and dollar limits
+- Per-market contract limit
+- Worst-case correlated event-risk limit
+- Daily exposure and loss limits
+- Deterministic duplicate protection
+- Database uniqueness constraints
+
+Changing an environment variable is not enough to enable live trading.
+
+## Order Management System
+
+The OMS implements:
+
+- Explicit order states
+- Table-driven legal state transitions
+- Terminal-state protection
+- Unknown-state recovery through reconciliation
+- Deterministic client order IDs
+- Duplicate-order collision detection
+- Exchange acknowledgement recording
+- Partial and complete fill handling
+- Duplicate-fill protection
+- Read-only comparison with Kalshi records
+
+The reconciliation command reports differences but never repairs or changes records automatically.
+
+## Position sizing
+
+Position size uses quarter-Kelly:
+
+- Full Kelly estimates the mathematically optimal risk fraction.
+- Only 25% of that amount is considered.
+- Hard risk limits can reduce it further.
+- If one contract cannot fit safely, the trade is skipped.
+
+The default early paper policy still permits only one contract per order. This deliberately prioritizes validation over simulated profit.
+
+## Measurements
+
+The analysis layer calculates:
+
+- Mean forecast error
+- Mean absolute error
+- Root mean squared error
+- Walk-forward bias-correction performance
+- Paper profit and loss
+- Win rate
+- Return on cost
+- Maximum drawdown
+- Brier score
+- Log loss
+- Expected calibration error
+- Minimum, mean, 95th-percentile, and maximum decision latency
+
+Historical calculations use only information available at the original decision time.
+
+## Setup
+
+Requirements:
+
+- Python 3.12
+- Docker Desktop
+- PostgreSQL through Docker Compose
 
 ```bash
 cp .env.example .env
 docker compose up -d postgres
+
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
+
 python -m weather_oms.storage.init_db
-pytest
-weather-oms
 ```
 
-With no Kalshi credentials, the process runs forecast ingestion only. Add demo credentials
-and comma-separated market tickers to enable the authenticated market stream. Keep
-`TRADING_MODE=paper`; there is intentionally no live order adapter in this milestone.
+Run verification:
 
-## Suggested build sequence for the owner
+```bash
+ruff check .
+mypy src tests
+pytest
+```
 
-1. Draw the full order lifecycle—including partial fills, cancellation, rejection, and an
-   unknown state after a timeout—then implement `transition()` with table-driven tests.
-2. Define the economic identity of one decision, implement a deterministic idempotency key,
-   and prove retry/concurrency behavior with tests.
-3. Derive binary Kelly on paper, implement validation/caps/rounding, then explain why a
-   fractional multiplier reduces sensitivity to probability-estimation error.
-4. Build a leakage-safe historical dataset keyed by model run time, valid date, and station;
-   fit the simplest bias baseline before adding complexity.
+## Important commands
 
-## Engineering questions this project should answer
+Save an aligned forecast and market snapshot:
 
-- What happens if submission times out but Kalshi accepted the order?
-- Can two workers act on the same signal without placing duplicates?
-- How is an order-book snapshot sequenced with subsequent deltas after reconnect?
-- Which timestamp defines forecast availability in a backtest?
-- Where is latency spent: ingest, signal, persistence, routing, or exchange acknowledgement?
-- How does performance change after fees, spread, slippage, and probability calibration?
+```bash
+python scripts/save_decision_snapshot.py YYYY-MM-DD
+```
+
+Compare probabilities with Kalshi prices:
+
+```bash
+python scripts/compare_forecast_to_kalshi.py YYYY-MM-DD
+```
+
+Preview pretend positions:
+
+```bash
+python scripts/save_paper_positions.py YYYY-MM-DD
+```
+
+Save approved pretend positions during the permitted forward window:
+
+```bash
+python scripts/save_paper_positions.py YYYY-MM-DD --save
+```
+
+Activate the paper kill switch:
+
+```bash
+python scripts/save_paper_positions.py YYYY-MM-DD --kill-switch
+```
+
+Inspect pretend positions:
+
+```bash
+python scripts/inspect_paper_positions.py YYYY-MM-DD
+```
+
+Settle eligible pretend positions:
+
+```bash
+python scripts/settle_paper_positions.py
+```
+
+View performance:
+
+```bash
+python scripts/report_paper_performance.py YYYY-MM-DD
+```
+
+Compare local OMS records with Kalshi:
+
+```bash
+python scripts/reconcile_orders.py EVENT_TICKER
+```
+
+Reconciliation is authenticated but read-only.
+
+## Project status
+
+| Milestone | Status |
+|---|---|
+| 1. Collect one forecast | Complete |
+| 2. Store forecasts and outcomes | Complete |
+| 3. Bias correction | Complete |
+| 4. Read Kalshi weather markets | Complete |
+| 5. Forecast-to-market comparison | Complete and verified with a real aligned snapshot |
+| 6. Order Management System | Complete within the no-order safety boundary |
+| 7. Position sizing | Complete |
+| 8. Paper trading | Implemented; forward runs are accumulating |
+| 9. Backtesting and measurements | Implemented; meaningful results require more samples |
+| 10. Dashboard and presentation | In progress |
 
 ## Current limitations
 
-- The paper fill model is intentionally simple and optimistic.
-- Forecast model-run metadata still needs a normalized parser and durable ingestion worker.
-- Reconciliation is a pure diff; automatic repair policy is not yet implemented.
-- No dashboard or historical NWS observations are included in Phase 1.
-- The event bus is in-process; a durable log (Redpanda/Kafka/NATS JetStream) is a later step,
-  justified only after failure recovery and replay requirements are measured.
+- Only Central Park station `KNYC` is currently validated.
+- Bias correction requires at least 30 eligible prior outcomes.
+- The paper fill model assumes immediate fills at the selected ask price.
+- Paper results are not evidence of future profitability.
+- Calibration metrics are not meaningful with very small samples.
+- Reconciliation reports differences but does not automatically repair them.
+- The event bus is in-process rather than durable.
+- No recruiter-facing dashboard exists yet.
 
-## Safety
+## Engineering decisions
 
-Never commit `.env` or PEM keys. Develop against Kalshi's demo environment. Enabling live
-execution should require an explicit code path, startup acknowledgement, hard exposure caps,
-and a kill switch—not merely changing an environment string.
+### Why save snapshots?
 
-## Milestones
+Forecasts and prices change over time. Saving their retrieval timestamps prevents future information from entering historical decisions.
 
-Milestone 1: Collect one forecast
-Get WeatherNext data for Central Park and understand it.
+### Why deterministic IDs?
 
+A retry after a timeout must represent the same logical action. Stable IDs prevent one decision from becoming multiple orders.
 
-Milestone 2: Save forecasts and actual temperatures
-Store what WeatherNext predicted and what temperature actually occurred.
-This gives us the historical information needed to answer:
-How wrong was WeatherNext?
+### Why an unknown order state?
 
+A network timeout does not prove that an order failed. The exchange may have accepted it. The OMS blocks blind retries until reconciliation determines the truth.
 
-Milestone 3: Build your bias-correction model
-Use previous forecast mistakes to improve future forecasts.
-This is one of the three core parts you will personally build.
+### Why model correlated event risk?
 
+Only one temperature bracket can win. Adding each position’s cost independently can misrepresent the true worst-case loss. The risk engine evaluates every possible winning bracket.
 
-Milestone 4: Read one Kalshi weather market
-Receive the prices and understand exactly what the market means and how it settles.
+### Why quarter-Kelly?
 
+Probability estimates contain error. Quarter-Kelly reduces sensitivity to overconfidence while retaining a principled connection between edge and size.
 
-Milestone 5: Compare our probability with Kalshi’s price
-Determine whether a possible opportunity exists.
-Still no orders yet.
+## Testing
 
+The automated suite covers:
 
-Milestone 6: Build the Order Management System
-Design and implement:
-Order states
-Safe state changes
-Duplicate-order protection
-Checking our records against Kalshi’s records
-This is the main systems-engineering portion of the project.
+- Forecast parsing and storage
+- Bias correction and walk-forward evaluation
+- Market probability calculations
+- Fees and edge calculations
+- Risk rules and kill-switch behavior
+- Position sizing
+- Paper planning, persistence, and settlement
+- Order states and invalid transitions
+- Order and fill idempotency
+- Reconciliation and authenticated read-only parsing
+- P&L, calibration, and latency metrics
 
+## Security
 
-Milestone 7: Build position sizing
-Decide how much pretend money to risk.
+Never commit:
 
+- `.env`
+- API private keys
+- PEM files
+- Production credentials
 
-Milestone 8: Paper trading
-Run the full system using pretend money.
-
-
-Milestone 9: Backtesting and measurements
-Measure:
-Prediction accuracy
-Profit or loss
-How quickly the system reacts
-Whether probabilities are trustworthy
-
-
-Milestone 10: Dashboard and project presentation
-README
-Architecture explanation
-
+Use a read-only Kalshi demo key for reconciliation.

@@ -42,6 +42,14 @@ def create_new_paper_risk_decision(
         kill_switch_active=kill_switch_active,
     )
 
+    model_probability = Decimal(
+        str(
+            comparison.our_yes_probability
+            if side == "yes"
+            else comparison.our_no_probability
+        )
+    )
+
     return NewPaperRiskDecision(
         decision_id=decision_id,
         event_ticker=event_ticker,
@@ -52,6 +60,8 @@ def create_new_paper_risk_decision(
         net_edge=Decimal(
             str(comparison.candidate_edge)
         ),
+        model_probability=model_probability,
+        contracts=proposed.contracts,
         allowed=risk_decision.allowed,
         reasons=risk_decision.reasons,
         proposed_risk_dollars=(

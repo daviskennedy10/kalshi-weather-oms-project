@@ -75,12 +75,12 @@ def create_new_paper_position(
 
     if side == "yes":
         entry_price_cents = comparison.yes_ask_cents
-        fee_dollars = Decimal(
+        fee_per_contract = Decimal(
             str(comparison.yes_fee_dollars)
         )
     else:
         entry_price_cents = comparison.no_ask_cents
-        fee_dollars = Decimal(
+        fee_per_contract = Decimal(
             str(comparison.no_fee_dollars)
         )
 
@@ -100,6 +100,8 @@ def create_new_paper_position(
         side=side,
         contracts=proposed.contracts,
         entry_price_cents=entry_price_cents,
-        fee_dollars=fee_dollars,
+        fee_dollars=(
+            fee_per_contract * proposed.contracts
+        ),
         opened_at=quote_retrieved_at.astimezone(UTC),
     )

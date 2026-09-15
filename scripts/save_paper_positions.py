@@ -15,13 +15,20 @@ from weather_oms.execution.paper_planner import (
 from weather_oms.execution.paper_position_factory import (
     create_new_paper_position,
 )
+from weather_oms.execution.paper_sizing import (
+    size_paper_candidate,
+)
 from weather_oms.execution.portfolio_risk import (
     summarize_portfolio_risk,
+)
+from weather_oms.execution.position_sizing import (
+    SizingDecision,
 )
 from weather_oms.signal.bias_correction import apply_bias_correction
 from weather_oms.signal.bias_model import ForecastFeatures
 from weather_oms.signal.forecast_dataset import prior_day_cutoff
 from weather_oms.signal.market_comparison import (
+    MarketComparison,
     compare_market_probability,
 )
 from weather_oms.signal.market_probability import (
@@ -105,6 +112,9 @@ async def save_paper_positions(
 
     results: list[
         tuple[PaperPlanItem, bool | None, bool | None]
+    ] = []
+    sizing_skips: list[
+        tuple[MarketComparison, SizingDecision]
     ] = []
 
     try:
@@ -263,12 +273,26 @@ async def save_paper_positions(
                 )
 
                 if comparison.candidate_side is not None:
-                    candidates.append(
-                        PaperCandidate(
-                            bracket_id=market.ticker,
-                            comparison=comparison,
-                        )
+                    sizing = size_paper_candidate(
+                        comparison=comparison,
+                        portfolio=portfolio,
+                        bankroll_dollars=(
+                            settings.paper_bankroll_dollars
+                        ),
                     )
+
+                    if sizing.should_trade:
+                        candidates.append(
+                            PaperCandidate(
+                                bracket_id=market.ticker,
+                                comparison=comparison,
+                                contracts=sizing.contracts,
+                            )
+                        )
+                    else:
+                        sizing_skips.append(
+                            (comparison, sizing)
+                        )
 
             plan = plan_paper_positions(
                 candidates=tuple(candidates),
@@ -364,10 +388,29 @@ async def save_paper_positions(
         "Quote age at cutoff: "
         f"{quote_age.total_seconds() / 60:.1f} minutes"
     )
-    print(f"Candidates found: {len(results)}")
+    print(
+        "Market opportunities: "
+        f"{len(results) + len(sizing_skips)}"
+    )
+    print(f"Positions sized: {len(results)}")
+    print(f"Sizing skips: {len(sizing_skips)}")
 
-    if not results:
+    if not results and not sizing_skips:
         print("No candidate exceeded the minimum net edge.")
+    
+    for comparison, sizing in sizing_skips:
+        side = comparison.candidate_side
+
+        print()
+        print(f"Market: {comparison.market_ticker}")
+        print(f"Side: {side.upper() if side else 'NONE'}")
+        print(
+            "Net edge: "
+            f"{comparison.candidate_edge * 100:+.1f} pp"
+        )
+        print("Sizing decision: SKIP")
+        print(f"Sizing reason: {sizing.reason}")
+        print("Database result: nothing saved")
 
     for plan_item, inserted, audit_inserted in results:
         comparison = plan_item.candidate.comparison
@@ -377,6 +420,10 @@ async def save_paper_positions(
         print()
         print(f"Market: {comparison.market_ticker}")
         print(f"Side: {side.upper() if side else 'NONE'}")
+        print(
+            "Contracts: "
+            f"{plan_item.risk_request.proposed_position.contracts}"
+        )
         print(
             "Net edge: "
             f"{comparison.candidate_edge * 100:+.1f} pp"

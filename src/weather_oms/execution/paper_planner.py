@@ -17,6 +17,7 @@ from weather_oms.signal.market_comparison import MarketComparison
 class PaperCandidate:
     bracket_id: str
     comparison: MarketComparison
+    contracts: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +36,10 @@ def plan_paper_positions(
     """Evaluate candidates from highest edge to lowest edge."""
 
     for candidate in candidates:
+        if candidate.contracts <= 0:
+            raise ValueError(
+                "Candidate contracts must be positive."
+            )
         if candidate.comparison.candidate_side is None:
             raise ValueError(
                 "Every paper candidate must have a candidate side."
@@ -60,6 +65,7 @@ def plan_paper_positions(
         risk_request = build_risk_request(
             comparison=candidate.comparison,
             bracket_id=candidate.bracket_id,
+            contracts=candidate.contracts,
             mode="paper",
             kill_switch_active=kill_switch_active,
             inputs_complete=True,

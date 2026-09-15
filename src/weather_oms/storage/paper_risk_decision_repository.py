@@ -1,9 +1,10 @@
 import hashlib
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,12 +22,24 @@ class NewPaperRiskDecision:
     quote_retrieved_at: datetime
     side: DecisionSide
     net_edge: Decimal
+    model_probability: Decimal
+    contracts: int
     allowed: bool
     reasons: tuple[str, ...]
     proposed_risk_dollars: Decimal
     event_risk_after_dollars: Decimal
     daily_exposure_after_dollars: Decimal
     kill_switch_active: bool
+
+@dataclass(frozen=True, slots=True)
+class StoredPaperDecisionTiming:
+    decision_id: str
+    quote_retrieved_at: datetime
+    stored_at: datetime
+
+    @property
+    def latency(self) -> timedelta:
+        return self.stored_at - self.quote_retrieved_at
 
 
 def create_paper_decision_id(
@@ -111,6 +124,36 @@ async def save_paper_risk_decision(
 
     return inserted_id is not None
 
+async def load_paper_decision_timings(
+    session: AsyncSession,
+    target_date: date | None = None,
+) -> tuple[StoredPaperDecisionTiming, ...]:
+    """Load timestamps needed for latency analysis."""
+
+    statement = select(PaperRiskDecision)
+
+    if target_date is not None:
+        statement = statement.where(
+            PaperRiskDecision.target_date == target_date
+        )
+
+    statement = statement.order_by(
+        PaperRiskDecision.quote_retrieved_at,
+        PaperRiskDecision.decision_id,
+    )
+
+    result = await session.execute(statement)
+    rows = result.scalars().all()
+
+    return tuple(
+        StoredPaperDecisionTiming(
+            decision_id=row.decision_id,
+            quote_retrieved_at=row.quote_retrieved_at,
+            stored_at=row.stored_at,
+        )
+        for row in rows
+    )
+
 
 def _validate_decision(
     decision: NewPaperRiskDecision,
@@ -140,6 +183,20 @@ def _validate_decision(
         raise ValueError(
             "net_edge must be finite and between -1 and 1."
         )
+    
+    if (
+        not decision.model_probability.is_finite()
+        or not Decimal(0)
+        <= decision.model_probability
+        <= Decimal(1)
+    ):
+        raise ValueError(
+            "model_probability must be finite and "
+            "between zero and one."
+        )
+
+    if decision.contracts <= 0:
+        raise ValueError("contracts must be positive.")
 
     risk_amounts = (
         decision.proposed_risk_dollars,

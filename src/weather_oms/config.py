@@ -1,3 +1,4 @@
+from decimal import Decimal
 from enum import StrEnum
 
 from pydantic import Field
@@ -18,6 +19,10 @@ class Settings(BaseSettings):
     kalshi_key_id: str | None = None
     kalshi_private_key_path: str | None = None
     market_tickers: str = ""
+    paper_bankroll_dollars: Decimal = Field(
+        default=Decimal("100.00"),
+        gt=0,
+    )
     forecast_refresh_seconds: int = Field(default=900, ge=60)
     settlement_refresh_seconds: int = Field(
     default=3600,

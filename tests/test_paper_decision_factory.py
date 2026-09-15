@@ -92,6 +92,9 @@ def test_creates_allowed_audit_record() -> None:
     assert record.event_risk_after_dollars == Decimal("0.2838")
     assert record.daily_exposure_after_dollars == Decimal("0.2838")
     assert record.kill_switch_active is False
+    assert record.model_probability == Decimal("0.47")
+    assert record.contracts == 1
+
 
 
 def test_creates_blocked_kill_switch_record() -> None:
