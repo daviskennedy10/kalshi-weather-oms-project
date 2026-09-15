@@ -32,6 +32,7 @@ class SettlementParseError(ValueError):
 class ParsedTemperatureSettlement:
     series_ticker: str
     event_ticker: str
+    winning_market_ticker: str
     station_code: str
     observation_date: date
     temperature_f: Decimal
@@ -102,6 +103,7 @@ def parse_temperature_settlement(
         )
 
     event_ticker = event.get("event_ticker")
+
     series_ticker = event.get("series_ticker")
 
     if not isinstance(event_ticker, str):
@@ -141,6 +143,18 @@ def parse_temperature_settlement(
     if len(winning_markets) != 1:
         raise SettlementParseError(
             "Settled event must contain exactly one winning market."
+        )
+
+    winning_market_ticker = winning_markets[0].get(
+        "ticker"
+    )
+
+    if (
+        not isinstance(winning_market_ticker, str)
+        or not winning_market_ticker
+    ):
+        raise SettlementParseError(
+            "Winning market is missing its ticker."
         )
 
     expiration_values: set[Decimal] = set()
@@ -183,6 +197,7 @@ def parse_temperature_settlement(
     return ParsedTemperatureSettlement(
         series_ticker=series_ticker,
         event_ticker=event_ticker,
+        winning_market_ticker=winning_market_ticker,
         station_code=station_code,
         observation_date=parse_event_date(event_ticker),
         temperature_f=expiration_values.pop(),

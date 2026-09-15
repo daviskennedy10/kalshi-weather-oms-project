@@ -4,11 +4,12 @@ from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 from weather_oms.config import Settings
+from weather_oms.execution.portfolio_risk import (
+    summarize_portfolio_risk,
+)
 from weather_oms.execution.risk import assess_risk
 from weather_oms.execution.risk_adapter import build_risk_request
-from weather_oms.signal.bias_correction import (
-    apply_bias_correction,
-)
+from weather_oms.signal.bias_correction import apply_bias_correction
 from weather_oms.signal.bias_model import ForecastFeatures
 from weather_oms.signal.forecast_dataset import prior_day_cutoff
 from weather_oms.signal.market_comparison import (
@@ -17,9 +18,7 @@ from weather_oms.signal.market_comparison import (
 from weather_oms.signal.market_probability import (
     calculate_event_probabilities,
 )
-from weather_oms.signal.market_timing import (
-    calculate_quote_age,
-)
+from weather_oms.signal.market_timing import calculate_quote_age
 from weather_oms.stations import STATIONS
 from weather_oms.storage.db import Database
 from weather_oms.storage.forecast_outcome_repository import (
@@ -30,6 +29,9 @@ from weather_oms.storage.forecast_repository import (
 )
 from weather_oms.storage.market_quote_repository import (
     load_latest_market_quotes_by_cutoff,
+)
+from weather_oms.storage.paper_position_repository import (
+    load_paper_positions_for_date,
 )
 
 
@@ -58,10 +60,7 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def event_ticker_for_date(target_date: date) -> str:
-    date_component = target_date.strftime(
-        "%y%b%d"
-    ).upper()
-
+    date_component = target_date.strftime("%y%b%d").upper()
     return f"KXHIGHNY-{date_component}"
 
 
@@ -115,6 +114,12 @@ async def compare(target_date: date) -> None:
                     cutoff_at=cutoff_at,
                 )
             )
+            paper_positions = (
+                await load_paper_positions_for_date(
+                    session=session,
+                    target_date=target_date,
+                )
+            )
     finally:
         await database.close()
 
@@ -131,7 +136,7 @@ async def compare(target_date: date) -> None:
             "the selection policy."
         )
         return
-    
+
     try:
         quote_age = calculate_quote_age(
             retrieved_at=market_quote_set.retrieved_at,
@@ -147,15 +152,12 @@ async def compare(target_date: date) -> None:
         time.min,
         local_zone,
     )
+
     forecast_retrieved_at_local = (
-        stored_forecast.retrieved_at.astimezone(
-            local_zone
-        )
+        stored_forecast.retrieved_at.astimezone(local_zone)
     )
     market_retrieved_at_local = (
-        market_quote_set.retrieved_at.astimezone(
-            local_zone
-        )
+        market_quote_set.retrieved_at.astimezone(local_zone)
     )
 
     lead_hours = (
@@ -165,9 +167,7 @@ async def compare(target_date: date) -> None:
     features = ForecastFeatures(
         raw_high_f=stored_forecast.mean_high_f,
         lead_hours=lead_hours,
-        ensemble_stddev_f=(
-            stored_forecast.standard_deviation_f
-        ),
+        ensemble_stddev_f=stored_forecast.standard_deviation_f,
         station=stored_forecast.station_code,
         day_of_year=target_date.timetuple().tm_yday,
     )
@@ -180,12 +180,22 @@ async def compare(target_date: date) -> None:
 
     markets = market_quote_set.markets
 
+    portfolio_summary = summarize_portfolio_risk(
+    positions=paper_positions,
+    current_event_ticker=event_ticker,
+    )
+
     probabilities = calculate_event_probabilities(
         member_highs_f=stored_forecast.member_highs_f,
         brackets=tuple(
             market.bracket for market in markets
         ),
         bias_adjustment_f=correction.learned_bias_f,
+    )
+
+    model_ready = (
+        len(stored_forecast.member_highs_f) == 64
+        and len(markets) == 6
     )
 
     print()
@@ -212,7 +222,7 @@ async def compare(target_date: date) -> None:
         f"{market_retrieved_at_local.isoformat()}"
     )
     print(
-        f"Ensemble members: "
+        "Ensemble members: "
         f"{len(stored_forecast.member_highs_f)}"
     )
     print(
@@ -227,10 +237,7 @@ async def compare(target_date: date) -> None:
     print()
     print("BIAS DECISION")
     print("-------------")
-    print(
-        f"Eligible outcomes: "
-        f"{correction.training_count}"
-    )
+    print(f"Eligible outcomes: {correction.training_count}")
     print(
         "Correction applied: "
         f"{'Yes' if correction.correction_applied else 'No'}"
@@ -244,6 +251,30 @@ async def compare(target_date: date) -> None:
         f"{correction.corrected_high_f:.2f}°F"
     )
     print(f"Reason: {correction.reason}")
+
+    print()
+    print("PAPER PORTFOLIO")
+    print("---------------")
+    print(
+        "Open positions in this event: "
+        f"{len(portfolio_summary.current_event_positions)}"
+    )
+    print(
+        "Current event risk: "
+        f"${portfolio_summary.current_event_risk_dollars:.4f}"
+    )
+    print(
+        "Other event risk: "
+        f"${portfolio_summary.other_event_risk_dollars:.4f}"
+    )
+    print(
+        "Total daily exposure: "
+        f"${portfolio_summary.total_daily_exposure_dollars:.4f}"
+    )
+    print(
+        "Daily realized loss: "
+        f"${portfolio_summary.daily_realized_loss_dollars:.4f}"
+    )
 
     print()
     print("MARKET COMPARISON")
@@ -264,9 +295,7 @@ async def compare(target_date: date) -> None:
             ),
         )
 
-        total_raw_probability += (
-            probability.raw_probability
-        )
+        total_raw_probability += probability.raw_probability
         total_smoothed_probability += (
             probability.smoothed_probability
         )
@@ -286,23 +315,30 @@ async def compare(target_date: date) -> None:
                 f"({comparison.candidate_edge * 100:+.1f} pp)"
             )
 
-        risk_request = build_risk_request(
-            comparison=comparison,
-            bracket_id=market.ticker,
-            mode="paper",
-            kill_switch_active=False,
-            inputs_complete=True,
-            inputs_aligned=True,
-            forecast_eligible=True,
-            quote_eligible=True,
-            quote_fresh=True,
-            model_ready=(
-                len(stored_forecast.member_highs_f) == 64
-                and len(markets) == 6
-            ),
-        )
+            risk_request = build_risk_request(
+                comparison=comparison,
+                bracket_id=market.ticker,
+                mode="paper",
+                kill_switch_active=False,
+                inputs_complete=True,
+                inputs_aligned=True,
+                forecast_eligible=True,
+                quote_eligible=True,
+                quote_fresh=True,
+                model_ready=model_ready,
+                existing_event_positions=(
+                portfolio_summary.current_event_positions
+                ),
+                other_daily_exposure_dollars=(
+                    portfolio_summary.other_event_risk_dollars
+                ),
+                daily_realized_loss_dollars=(
+                    portfolio_summary.daily_realized_loss_dollars
+                ),
+            )
 
-        risk_decision = assess_risk(risk_request)
+            risk_decision = assess_risk(risk_request)
+            
 
         print()
         print(f"Market: {market.ticker}")
@@ -363,7 +399,11 @@ async def compare(target_date: date) -> None:
         if risk_decision is None:
             print("Risk decision: NOT EVALUATED")
         else:
-            result = "ALLOW" if risk_decision.allowed else "BLOCK"
+            result = (
+                "ALLOW"
+                if risk_decision.allowed
+                else "BLOCK"
+            )
             print(f"Risk decision: {result}")
             print(
                 "Proposed risk: "
@@ -373,6 +413,7 @@ async def compare(target_date: date) -> None:
             for reason in risk_decision.reasons:
                 print(f"Risk reason: {reason}")
 
+    print()
     print(
         "Required minimum net edge: "
         f"{comparison.minimum_net_edge * 100:.1f} pp"
@@ -393,7 +434,7 @@ async def compare(target_date: date) -> None:
     print(
         "Warning: research and paper-risk output only. "
         "No orders are placed. Existing positions and daily "
-        "account totals are not connected yet."
+        "against the stored paper portfolio."
     )
 
 

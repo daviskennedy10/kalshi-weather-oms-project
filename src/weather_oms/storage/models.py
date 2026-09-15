@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -103,6 +104,11 @@ class TemperatureSettlement(Base):
         String(128),
         unique=True,
         index=True,
+    )
+
+    winning_market_ticker: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
     )
 
     station_code: Mapped[str] = mapped_column(
@@ -250,6 +256,221 @@ class Position(Base):
     net_count: Mapped[int] = mapped_column(Integer, default=0)
     cost_cents: Mapped[int] = mapped_column(Integer, default=0)
     realized_pnl_cents: Mapped[int] = mapped_column(Integer, default=0)
+
+class PaperPosition(Base):
+    __tablename__ = "paper_positions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    paper_order_id: Mapped[str] = mapped_column(
+        String(128),
+        unique=True,
+        index=True,
+    )
+
+    event_ticker: Mapped[str] = mapped_column(
+        String(128),
+        index=True,
+    )
+
+    market_ticker: Mapped[str] = mapped_column(
+        String(128),
+        index=True,
+    )
+
+    target_date: Mapped[date] = mapped_column(
+        Date,
+        index=True,
+    )
+
+    side: Mapped[str] = mapped_column(
+        String(8),
+    )
+
+    contracts: Mapped[int] = mapped_column(
+        Integer,
+    )
+
+    entry_price_cents: Mapped[int] = mapped_column(
+        Integer,
+    )
+
+    fee_dollars: Mapped[Decimal] = mapped_column(
+        Numeric(10, 4),
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(16),
+        index=True,
+        default="open",
+    )
+
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+    )
+
+    settlement_result: Mapped[str | None] = mapped_column(
+        String(8),
+        nullable=True,
+    )
+
+    payout_dollars: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 4),
+        nullable=True,
+    )
+
+    realized_pnl_dollars: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 4),
+        nullable=True,
+    )
+
+    settled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "side IN ('yes', 'no')",
+            name="ck_paper_position_side",
+        ),
+        CheckConstraint(
+            "contracts > 0",
+            name="ck_paper_position_positive_contracts",
+        ),
+        CheckConstraint(
+            "entry_price_cents BETWEEN 0 AND 100",
+            name="ck_paper_position_entry_price",
+        ),
+        CheckConstraint(
+            "fee_dollars >= 0",
+            name="ck_paper_position_nonnegative_fee",
+        ),
+        CheckConstraint(
+            "status IN ('open', 'settled')",
+            name="ck_paper_position_status",
+        ),
+        CheckConstraint(
+            (
+                "(status = 'open' "
+                "AND settlement_result IS NULL "
+                "AND payout_dollars IS NULL "
+                "AND realized_pnl_dollars IS NULL "
+                "AND settled_at IS NULL) "
+                "OR "
+                "(status = 'settled' "
+                "AND settlement_result IN ('yes', 'no') "
+                "AND payout_dollars IS NOT NULL "
+                "AND realized_pnl_dollars IS NOT NULL "
+                "AND settled_at IS NOT NULL)"
+            ),
+            name="ck_paper_position_settlement_fields",
+        ),
+    )
+
+class PaperRiskDecision(Base):
+    __tablename__ = "paper_risk_decisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    decision_id: Mapped[str] = mapped_column(
+        String(128),
+        unique=True,
+        index=True,
+    )
+
+    event_ticker: Mapped[str] = mapped_column(
+        String(128),
+        index=True,
+    )
+
+    market_ticker: Mapped[str] = mapped_column(
+        String(128),
+        index=True,
+    )
+
+    target_date: Mapped[date] = mapped_column(
+        Date,
+        index=True,
+    )
+
+    quote_retrieved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+    )
+
+    side: Mapped[str] = mapped_column(
+        String(8),
+    )
+
+    net_edge: Mapped[Decimal] = mapped_column(
+        Numeric(10, 6),
+    )
+
+    allowed: Mapped[bool] = mapped_column(
+        Boolean,
+    )
+
+    reasons: Mapped[list[str]] = mapped_column(
+        JSONB,
+    )
+
+    proposed_risk_dollars: Mapped[Decimal] = mapped_column(
+        Numeric(10, 4),
+    )
+
+    event_risk_after_dollars: Mapped[Decimal] = mapped_column(
+        Numeric(10, 4),
+    )
+
+    daily_exposure_after_dollars: Mapped[Decimal] = mapped_column(
+        Numeric(10, 4),
+    )
+
+    kill_switch_active: Mapped[bool] = mapped_column(
+        Boolean,
+    )
+
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "side IN ('yes', 'no')",
+            name="ck_paper_risk_decision_side",
+        ),
+        CheckConstraint(
+            "net_edge BETWEEN -1 AND 1",
+            name="ck_paper_risk_decision_edge",
+        ),
+        CheckConstraint(
+            "proposed_risk_dollars >= 0",
+            name="ck_paper_risk_decision_proposed_risk",
+        ),
+        CheckConstraint(
+            "event_risk_after_dollars >= 0",
+            name="ck_paper_risk_decision_event_risk",
+        ),
+        CheckConstraint(
+            "daily_exposure_after_dollars >= 0",
+            name="ck_paper_risk_decision_daily_exposure",
+        ),
+    )
 
 
 class Settlement(Base):

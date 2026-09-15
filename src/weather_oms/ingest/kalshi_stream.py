@@ -1,37 +1,13 @@
 import asyncio
-import base64
 import json
-import time
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any, cast
 
 import websockets
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from weather_oms.bus import EventBus
 from weather_oms.events import Event, EventKind
-
-
-def auth_headers(key_id: str, private_key_path: str) -> dict[str, str]:
-    timestamp = str(int(time.time() * 1000))
-    message = f"{timestamp}GET/trade-api/ws/v2".encode()
-    key = serialization.load_pem_private_key(Path(private_key_path).read_bytes(), password=None)
-    if not isinstance(key, rsa.RSAPrivateKey):
-        raise TypeError(
-            "Kalshi authentication requires an RSA private key."
-        )
-    signature = key.sign(
-        message,
-        padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.DIGEST_LENGTH),
-        hashes.SHA256(),
-    )
-    return {
-        "KALSHI-ACCESS-KEY": key_id,
-        "KALSHI-ACCESS-TIMESTAMP": timestamp,
-        "KALSHI-ACCESS-SIGNATURE": base64.b64encode(signature).decode(),
-    }
+from weather_oms.ingest.kalshi_auth import auth_headers
 
 
 class KalshiStream:
@@ -41,7 +17,12 @@ class KalshiStream:
 
     async def _session(self) -> None:
         async with websockets.connect(
-            self.url, additional_headers=auth_headers(self.key_id, self.key_path)
+            self.url,
+            additional_headers=auth_headers(
+                self.key_id,
+                self.key_path,
+                "/trade-api/ws/v2",
+            ),
         ) as ws:
             await ws.send(json.dumps({
                 "id": 1,

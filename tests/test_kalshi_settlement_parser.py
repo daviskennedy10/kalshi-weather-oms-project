@@ -72,6 +72,10 @@ def test_parses_temperature_settlement() -> None:
         tzinfo=UTC,
     )
     assert settlement.retrieved_at == retrieved_at
+    assert (
+        settlement.winning_market_ticker
+        == "KXHIGHNY-26SEP03-B83.5"
+    )
 
 
 def test_rejects_multiple_winning_markets() -> None:
@@ -115,6 +119,22 @@ def test_rejects_invalid_event_date() -> None:
     with pytest.raises(
         SettlementParseError,
         match="Could not read a date",
+    ):
+        parse_temperature_settlement(
+            event=event,
+            station_code="KNYC",
+            source_name="The Weather Company",
+            source_url="https://weather.com/kalshi",
+            retrieved_at=datetime.now(UTC),
+        )
+
+def test_rejects_winning_market_without_ticker() -> None:
+    event = make_settled_event()
+    del event["markets"][1]["ticker"]
+
+    with pytest.raises(
+        SettlementParseError,
+        match="missing its ticker",
     ):
         parse_temperature_settlement(
             event=event,

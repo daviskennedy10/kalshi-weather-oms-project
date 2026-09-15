@@ -30,8 +30,22 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.market_tickers.split(",") if item.strip()]
 
     @property
+    def kalshi_rest_url(self) -> str:
+        if self.kalshi_env == "prod":
+            return (
+                "https://external-api.kalshi.com"
+                "/trade-api/v2"
+            )
+
+        return (
+            "https://external-api.demo.kalshi.co"
+            "/trade-api/v2"
+        )
+
+    @property
     def kalshi_ws_url(self) -> str:
         if self.kalshi_env == "prod":
             return "wss://external-api-ws.kalshi.com/trade-api/ws/v2"
         return "wss://external-api-ws.demo.kalshi.co/trade-api/ws/v2"
+    
 

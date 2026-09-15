@@ -43,6 +43,7 @@ class FakeSettlementClient:
                     "event_ticker": "KXHIGHNY-26SEP04",
                     "markets": [
                         {
+                            "ticker": "KXHIGHNY-26SEP04-T83",
                             "result": "no",
                             "expiration_value": "84.00",
                             "settlement_ts": (
@@ -50,6 +51,7 @@ class FakeSettlementClient:
                             ),
                         },
                         {
+                            "ticker": "KXHIGHNY-26SEP04-B83.5",
                             "result": "yes",
                             "expiration_value": "84.00",
                             "settlement_ts": (
@@ -91,6 +93,10 @@ async def test_poller_publishes_new_settlement_once() -> None:
     assert settlement.event_ticker == "KXHIGHNY-26SEP04"
     assert settlement.station_code == "KNYC"
     assert settlement.temperature_f == Decimal("84.00")
+    assert (
+        settlement.winning_market_ticker
+        == "KXHIGHNY-26SEP04-B83.5"
+    )
 
     await poller.poll_once()
 
