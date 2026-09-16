@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+    <title>Weather Kalshi OMS</title>
+    <link
+        rel="stylesheet"
+        href="/static/styles.css"
+    >
+</head>
+<body>
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">PAPER TRADING SYSTEM</p>
+            <h1>Weather Kalshi OMS</h1>
+        </div>
+
+        <div class="status">
+            <span class="status-dot"></span>
+            Read-only
+        </div>
+    </header>
+
+    <main>
+        <section class="controls">
+            <div>
+                <h2>Performance dashboard</h2>
+                <p>
+                    Paper positions, risk results and model quality.
+                </p>
+            </div>
+
+            <form id="date-form">
+                <label for="target-date">Target date</label>
+                <div class="date-controls">
+                    <input
+                        id="target-date"
+                        name="target-date"
+                        type="date"
+                        required
+                    >
+                    <button type="submit">Load report</button>
+                </div>
+            </form>
+        </section>
+
+        <p id="message" class="message">
+            Choose a target date to load its results.
+        </p>
+
+        <section id="dashboard" class="dashboard hidden">
+            <div class="metric-grid">
+                <article class="card featured">
+                    <p class="card-label">Total P&amp;L</p>
+                    <p id="total-pnl" class="metric-value">$0.00</p>
+                    <p id="return-on-cost" class="metric-detail">
+                        Return on cost: N/A
+                    </p>
+                </article>
+
+                <article class="card">
+                    <p class="card-label">Positions</p>
+                    <p id="total-positions" class="metric-value">0</p>
+                    <p id="position-status" class="metric-detail">
+                        0 open · 0 settled
+                    </p>
+                </article>
+
+                <article class="card">
+                    <p class="card-label">Win rate</p>
+                    <p id="win-rate" class="metric-value">N/A</p>
+                    <p id="win-record" class="metric-detail">
+                        0 wins · 0 losses
+                    </p>
+                </article>
+
+                <article class="card">
+                    <p class="card-label">Mean latency</p>
+                    <p id="mean-latency" class="metric-value">N/A</p>
+                    <p id="latency-samples" class="metric-detail">
+                        0 samples
+                    </p>
+                </article>
+            </div>
+
+            <div class="detail-grid">
+                <article class="panel">
+                    <h3>Profit and loss</h3>
+
+                    <dl>
+                        <div>
+                            <dt>Total cost</dt>
+                            <dd id="total-cost">$0.00</dd>
+                        </div>
+                        <div>
+                            <dt>Total payout</dt>
+                            <dd id="total-payout">$0.00</dd>
+                        </div>
+                        <div>
+                            <dt>Average P&amp;L</dt>
+                            <dd id="average-pnl">N/A</dd>
+                        </div>
+                        <div>
+                            <dt>Maximum drawdown</dt>
+                            <dd id="maximum-drawdown">$0.00</dd>
+                        </div>
+                    </dl>
+                </article>
+
+                <article class="panel">
+                    <h3>Probability quality</h3>
+
+                    <dl>
+                        <div>
+                            <dt>Brier score</dt>
+                            <dd id="brier-score">N/A</dd>
+                        </div>
+                        <div>
+                            <dt>Log loss</dt>
+                            <dd id="log-loss">N/A</dd>
+                        </div>
+                        <div>
+                            <dt>Calibration error</dt>
+                            <dd id="calibration-error">N/A</dd>
+                        </div>
+                        <div>
+                            <dt>Samples</dt>
+                            <dd id="probability-samples">0</dd>
+                        </div>
+                    </dl>
+                </article>
+
+                <article class="panel">
+                    <h3>Decision latency</h3>
+
+                    <dl>
+                        <div>
+                            <dt>Minimum</dt>
+                            <dd id="minimum-latency">N/A</dd>
+                        </div>
+                        <div>
+                            <dt>Mean</dt>
+                            <dd id="detail-mean-latency">N/A</dd>
+                        </div>
+                        <div>
+                            <dt>95th percentile</dt>
+                            <dd id="p95-latency">N/A</dd>
+                        </div>
+                        <div>
+                            <dt>Maximum</dt>
+                            <dd id="maximum-latency">N/A</dd>
+                        </div>
+                    </dl>
+                </article>
+            </div>
+
+            <p class="safety">
+                Research and paper trading only. No real orders are placed.
+            </p>
+        </section>
+    </main>
+
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

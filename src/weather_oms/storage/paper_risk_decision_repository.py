@@ -96,6 +96,8 @@ async def save_paper_risk_decision(
             ),
             side=decision.side,
             net_edge=decision.net_edge,
+            model_probability=decision.model_probability,
+            contracts=decision.contracts,
             allowed=decision.allowed,
             reasons=list(decision.reasons),
             proposed_risk_dollars=(

@@ -1,8 +1,11 @@
 from datetime import date, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from weather_oms.dashboard.dependencies import (
@@ -71,6 +74,27 @@ app = FastAPI(
     ),
     version="0.1.0",
 )
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+app.mount(
+    "/static",
+    StaticFiles(directory=STATIC_DIR),
+    name="static",
+)
+
+
+@app.get(
+    "/",
+    response_class=FileResponse,
+    include_in_schema=False,
+)
+async def dashboard_page() -> FileResponse:
+    """Serve the read-only visual dashboard."""
+
+    return FileResponse(
+        STATIC_DIR / "index.html"
+    )
 
 
 @app.get(
