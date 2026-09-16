@@ -52,6 +52,14 @@ class ProbabilitySummaryResponse(BaseModel):
     log_loss: float
     calibration_error: float
 
+class PaperPositionResponse(BaseModel):
+    market_ticker: str
+    side: Literal["yes", "no"]
+    contracts: int
+    entry_price_cents: int
+    fee_dollars: Decimal
+    status: Literal["open", "settled"]
+    realized_pnl_dollars: Decimal | None
 
 class DashboardResponse(BaseModel):
     target_date: date
@@ -59,6 +67,7 @@ class DashboardResponse(BaseModel):
     profit: ProfitSummaryResponse
     latency: LatencySummaryResponse
     probability: ProbabilitySummaryResponse | None
+    paper_positions: list[PaperPositionResponse]
 
 
 DashboardDependency = Annotated[
@@ -170,6 +179,22 @@ async def performance(
             maximum_ms=_milliseconds(latency.maximum),
         ),
         probability=probability_response,
+        paper_positions=[
+            PaperPositionResponse(
+                market_ticker=position.market_ticker,
+                side=position.side,
+                contracts=position.contracts,
+                entry_price_cents=(
+                    position.entry_price_cents
+                ),
+                fee_dollars=position.fee_dollars,
+                status=position.status,
+                realized_pnl_dollars=(
+                    position.realized_pnl_dollars
+                ),
+            )
+            for position in summary.positions
+        ],
     )
 
 

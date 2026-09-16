@@ -58,6 +58,7 @@ function renderReport(report) {
     const profit = report.profit;
     const latency = report.latency;
     const probability = report.probability;
+    renderPositions(report.paper_positions);
 
     setText(
         "total-pnl",
@@ -235,4 +236,102 @@ function formatMilliseconds(value) {
 
 function formatScore(value) {
     return Number(value).toFixed(4);
+}
+
+function renderPositions(positions) {
+    const body = document.querySelector("#positions-body");
+    const emptyMessage = document.querySelector(
+        "#empty-positions"
+    );
+
+    body.replaceChildren();
+
+    setText(
+        "table-position-count",
+        `${positions.length} ${
+            positions.length === 1
+                ? "position"
+                : "positions"
+        }`
+    );
+
+    emptyMessage.classList.toggle(
+        "hidden",
+        positions.length > 0
+    );
+
+    for (const position of positions) {
+        body.appendChild(createPositionRow(position));
+    }
+}
+
+function createPositionRow(position) {
+    const row = document.createElement("tr");
+
+    row.appendChild(
+        createCell(position.market_ticker)
+    );
+    row.appendChild(
+        createBadgeCell(
+            position.side,
+            `side-badge side-${position.side}`
+        )
+    );
+    row.appendChild(
+        createCell(String(position.contracts))
+    );
+    row.appendChild(
+        createCell(`${position.entry_price_cents}¢`)
+    );
+    row.appendChild(
+        createCell(formatDollars(position.fee_dollars))
+    );
+    row.appendChild(
+        createBadgeCell(
+            position.status,
+            `state-badge state-${position.status}`
+        )
+    );
+    row.appendChild(
+        createPnlCell(position.realized_pnl_dollars)
+    );
+
+    return row;
+}
+
+function createCell(text) {
+    const cell = document.createElement("td");
+    cell.textContent = text;
+    return cell;
+}
+
+function createBadgeCell(text, className) {
+    const cell = document.createElement("td");
+    const badge = document.createElement("span");
+
+    badge.className = className;
+    badge.textContent = text;
+    cell.appendChild(badge);
+
+    return cell;
+}
+
+function createPnlCell(value) {
+    const cell = document.createElement("td");
+
+    if (value === null) {
+        cell.textContent = "Pending";
+        return cell;
+    }
+
+    const number = Number(value);
+
+    cell.textContent = formatSignedDollars(number);
+    cell.className = (
+        number >= 0
+            ? "pnl-positive"
+            : "pnl-negative"
+    );
+
+    return cell;
 }

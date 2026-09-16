@@ -26,6 +26,7 @@ from weather_oms.storage.paper_risk_decision_repository import (
 
 @dataclass(frozen=True, slots=True)
 class DashboardSummary:
+    positions: tuple[StoredPaperPosition, ...]
     performance: PaperPerformance
     latency: LatencyMetrics
     probability: ProbabilityMetrics | None
@@ -77,6 +78,7 @@ def build_dashboard_summary(
     )
 
     return DashboardSummary(
+        positions=positions,
         performance=performance,
         latency=latency,
         probability=probability,

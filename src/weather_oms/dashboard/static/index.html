@@ -87,6 +87,41 @@
                 </article>
             </div>
 
+            <section class="positions-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h3>Paper positions</h3>
+                        <p>
+                            Pretend trades recorded for the selected date.
+                        </p>
+                    </div>
+                    <span id="table-position-count" class="count-badge">
+                        0 positions
+                    </span>
+                </div>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Market</th>
+                                <th>Side</th>
+                                <th>Contracts</th>
+                                <th>Entry</th>
+                                <th>Fee</th>
+                                <th>Status</th>
+                                <th>Final P&amp;L</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positions-body">
+                        </tbody>
+                    </table>
+                </div>
+
+                <p id="empty-positions" class="empty-table">
+                    No paper positions were recorded.
+                </p>
+            </section>
             <div class="detail-grid">
                 <article class="panel">
                     <h3>Profit and loss</h3>
