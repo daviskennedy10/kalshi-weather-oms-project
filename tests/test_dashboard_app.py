@@ -54,6 +54,7 @@ async def test_performance_endpoint() -> None:
             positions=(),
             stored_timings=(),
             observations=(),
+            decision_metrics=(),
         )
 
     app.dependency_overrides[

@@ -18,6 +18,7 @@ from weather_oms.storage.paper_position_repository import (
     load_paper_positions_for_date,
 )
 from weather_oms.storage.paper_risk_decision_repository import (
+    load_paper_decision_metrics,
     load_paper_decision_timings,
 )
 
@@ -52,6 +53,10 @@ async def get_dashboard_summary(
         session=session,
         target_date=target_date,
     )
+    decision_metrics = await load_paper_decision_metrics(
+        session=session,
+        target_date=target_date,
+    )
     observations = (
         await load_paper_probability_observations(
             session=session,
@@ -63,4 +68,5 @@ async def get_dashboard_summary(
         positions=positions,
         stored_timings=timings,
         observations=observations,
+        decision_metrics=decision_metrics,
     )

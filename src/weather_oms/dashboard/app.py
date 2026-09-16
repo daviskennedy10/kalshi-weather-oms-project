@@ -60,6 +60,8 @@ class PaperPositionResponse(BaseModel):
     fee_dollars: Decimal
     status: Literal["open", "settled"]
     realized_pnl_dollars: Decimal | None
+    model_probability: Decimal | None
+    net_edge: Decimal | None
 
 class DashboardResponse(BaseModel):
     target_date: date
@@ -181,19 +183,29 @@ async def performance(
         probability=probability_response,
         paper_positions=[
             PaperPositionResponse(
-                market_ticker=position.market_ticker,
-                side=position.side,
-                contracts=position.contracts,
+                market_ticker=(
+                    dashboard_position.position.market_ticker
+                ),
+                side=dashboard_position.position.side,
+                contracts=(
+                    dashboard_position.position.contracts
+                ),
                 entry_price_cents=(
-                    position.entry_price_cents
+                    dashboard_position.position.entry_price_cents
                 ),
-                fee_dollars=position.fee_dollars,
-                status=position.status,
+                fee_dollars=(
+                    dashboard_position.position.fee_dollars
+                ),
+                status=dashboard_position.position.status,
                 realized_pnl_dollars=(
-                    position.realized_pnl_dollars
+                    dashboard_position.position.realized_pnl_dollars
                 ),
+                model_probability=(
+                    dashboard_position.model_probability
+                ),
+                net_edge=dashboard_position.net_edge,
             )
-            for position in summary.positions
+            for dashboard_position in summary.positions
         ],
     )
 

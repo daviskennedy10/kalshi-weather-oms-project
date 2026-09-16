@@ -202,6 +202,9 @@ function setPnlColor(value) {
 function formatDollars(value) {
     return `$${Number(value).toFixed(2)}`;
 }
+function formatPreciseDollars(value) {
+    return `$${Number(value).toFixed(4)}`;
+}
 
 function formatSignedDollars(value) {
     const number = Number(value);
@@ -278,13 +281,21 @@ function createPositionRow(position) {
         )
     );
     row.appendChild(
+        createCell(
+            formatPercentage(position.model_probability)
+        )
+    );
+    row.appendChild(
+        createEdgeCell(position.net_edge)
+    );
+    row.appendChild(
         createCell(String(position.contracts))
     );
     row.appendChild(
         createCell(`${position.entry_price_cents}¢`)
     );
     row.appendChild(
-        createCell(formatDollars(position.fee_dollars))
+        createCell(formatPreciseDollars(position.fee_dollars))
     );
     row.appendChild(
         createBadgeCell(
@@ -327,6 +338,29 @@ function createPnlCell(value) {
     const number = Number(value);
 
     cell.textContent = formatSignedDollars(number);
+    cell.className = (
+        number >= 0
+            ? "pnl-positive"
+            : "pnl-negative"
+    );
+
+    return cell;
+}
+function createEdgeCell(value) {
+    const cell = document.createElement("td");
+
+    if (value === null) {
+        cell.textContent = "N/A";
+        return cell;
+    }
+
+    const number = Number(value);
+
+    cell.textContent = (
+        `${number >= 0 ? "+" : ""}`
+        + `${(number * 100).toFixed(1)} pp`
+    );
+
     cell.className = (
         number >= 0
             ? "pnl-positive"

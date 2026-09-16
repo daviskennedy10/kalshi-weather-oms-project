@@ -2,7 +2,7 @@ import hashlib
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, cast
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -30,6 +30,15 @@ class NewPaperRiskDecision:
     event_risk_after_dollars: Decimal
     daily_exposure_after_dollars: Decimal
     kill_switch_active: bool
+
+@dataclass(frozen=True, slots=True)
+class StoredPaperDecisionMetric:
+    market_ticker: str
+    side: DecisionSide
+    contracts: int
+    model_probability: Decimal
+    net_edge: Decimal
+    quote_retrieved_at: datetime
 
 @dataclass(frozen=True, slots=True)
 class StoredPaperDecisionTiming:
@@ -152,6 +161,39 @@ async def load_paper_decision_timings(
             decision_id=row.decision_id,
             quote_retrieved_at=row.quote_retrieved_at,
             stored_at=row.stored_at,
+        )
+        for row in rows
+    )
+
+async def load_paper_decision_metrics(
+    session: AsyncSession,
+    target_date: date,
+) -> tuple[StoredPaperDecisionMetric, ...]:
+    """Load approved decision values for dashboard positions."""
+
+    statement = (
+        select(PaperRiskDecision)
+        .where(
+            PaperRiskDecision.target_date == target_date,
+            PaperRiskDecision.allowed.is_(True),
+        )
+        .order_by(
+            PaperRiskDecision.quote_retrieved_at,
+            PaperRiskDecision.decision_id,
+        )
+    )
+
+    result = await session.execute(statement)
+    rows = result.scalars().all()
+
+    return tuple(
+        StoredPaperDecisionMetric(
+            market_ticker=row.market_ticker,
+            side=cast(DecisionSide, row.side),
+            contracts=row.contracts,
+            model_probability=row.model_probability,
+            net_edge=row.net_edge,
+            quote_retrieved_at=row.quote_retrieved_at,
         )
         for row in rows
     )

@@ -13,6 +13,7 @@ from weather_oms.storage.paper_position_repository import (
     StoredPaperPosition,
 )
 from weather_oms.storage.paper_risk_decision_repository import (
+    StoredPaperDecisionMetric,
     StoredPaperDecisionTiming,
 )
 
@@ -61,6 +62,23 @@ def make_timing() -> StoredPaperDecisionTiming:
         stored_at=quote_time + timedelta(seconds=2),
     )
 
+def make_decision_metric() -> StoredPaperDecisionMetric:
+    return StoredPaperDecisionMetric(
+        market_ticker="KXHIGHNY-26SEP15-T85",
+        side="yes",
+        contracts=1,
+        model_probability=Decimal("0.70"),
+        net_edge=Decimal("0.15"),
+        quote_retrieved_at=datetime(
+            2026,
+            9,
+            14,
+            15,
+            50,
+            tzinfo=UTC,
+        ),
+    )
+
 
 def make_observation() -> PaperProbabilityObservation:
     return PaperProbabilityObservation(
@@ -78,6 +96,7 @@ def test_builds_complete_dashboard_summary() -> None:
         positions=(make_position(),),
         stored_timings=(make_timing(),),
         observations=(make_observation(),),
+        decision_metrics=(make_decision_metric(),),
     )
 
     assert summary.performance.total_positions == 1
@@ -92,6 +111,15 @@ def test_builds_complete_dashboard_summary() -> None:
     assert summary.probability.brier_score == pytest.approx(
         0.09
     )
+    assert len(summary.positions) == 1
+    assert (
+        summary.positions[0].model_probability
+        == Decimal("0.70")
+    )
+    assert (
+        summary.positions[0].net_edge
+        == Decimal("0.15")
+    )
 
 
 def test_builds_empty_dashboard_summary() -> None:
@@ -99,6 +127,7 @@ def test_builds_empty_dashboard_summary() -> None:
         positions=(),
         stored_timings=(),
         observations=(),
+        decision_metrics=(),
     )
 
     assert summary.performance.total_positions == 0
