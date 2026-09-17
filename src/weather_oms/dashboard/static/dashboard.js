@@ -59,6 +59,7 @@ function renderReport(report) {
     const latency = report.latency;
     const probability = report.probability;
     renderPositions(report.paper_positions);
+    renderPnlChart(report.paper_positions);
 
     setText(
         "total-pnl",
@@ -208,9 +209,17 @@ function formatPreciseDollars(value) {
 
 function formatSignedDollars(value) {
     const number = Number(value);
-    const sign = number > 0 ? "+" : "";
 
-    return `${sign}$${number.toFixed(2)}`;
+    if (number > 0) {
+        return `+$${number.toFixed(2)}`;
+    }
+
+    if (number < 0) {
+        const num = Math.abs(number).toFixed(2);
+        return `-$${num}`;
+    }
+
+    return "$0.00";
 }
 
 function formatOptionalSignedDollars(value) {
@@ -368,4 +377,110 @@ function createEdgeCell(value) {
     );
 
     return cell;
+}
+
+function renderPnlChart(positions) {
+    const chart = document.querySelector(
+        "#position-pnl-chart"
+    );
+    const emptyMessage = document.querySelector(
+        "#empty-pnl-chart"
+    );
+
+    const settledPositions = positions.filter(
+        (position) => (
+            position.realized_pnl_dollars !== null
+        )
+    );
+
+    chart.replaceChildren();
+
+    emptyMessage.classList.toggle(
+        "hidden",
+        settledPositions.length > 0
+    );
+
+    if (settledPositions.length === 0) {
+        return;
+    }
+
+    const maximumMagnitude = Math.max(
+        ...settledPositions.map(
+            (position) => Math.abs(
+                Number(position.realized_pnl_dollars)
+            )
+        )
+    );
+
+    for (const position of settledPositions) {
+        chart.appendChild(
+            createPnlChartRow(
+                position,
+                maximumMagnitude
+            )
+        );
+    }
+}
+
+function createPnlChartRow(position, maximumMagnitude) {
+    const value = Number(
+        position.realized_pnl_dollars
+    );
+    const width = (
+        maximumMagnitude === 0
+            ? 0
+            : Math.abs(value) / maximumMagnitude * 100
+    );
+
+    const row = document.createElement("div");
+    row.className = "pnl-chart-row";
+
+    const label = document.createElement("span");
+    label.className = "pnl-chart-label";
+    label.textContent = position.market_ticker;
+
+    const track = document.createElement("div");
+    track.className = "pnl-chart-track";
+
+    const bar = document.createElement("div");
+    bar.className = (
+        `pnl-chart-bar ${
+            value >= 0 ? "positive" : "negative"
+        }`
+    );
+    bar.style.width = `${Math.max(width, 1)}%`;
+
+    const displayedValue = document.createElement("span");
+    displayedValue.className = (
+        `pnl-chart-value ${
+            value >= 0
+                ? "pnl-positive"
+                : "pnl-negative"
+        }`
+    );
+    displayedValue.textContent = (
+        formatSignedPreciseDollars(value)
+    );
+
+    track.appendChild(bar);
+    row.appendChild(label);
+    row.appendChild(track);
+    row.appendChild(displayedValue);
+
+    return row;
+}
+
+function formatSignedPreciseDollars(value) {
+    const number = Number(value);
+
+    if (number > 0) {
+        return `+$${number.toFixed(4)}`;
+    }
+
+    if (number < 0) {
+        const num = Math.abs(number).toFixed(4);
+        return `-$${num}`;
+    }
+
+    return "$0.0000";
 }

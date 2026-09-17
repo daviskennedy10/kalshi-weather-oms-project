@@ -9,7 +9,7 @@
     <title>Weather Kalshi OMS</title>
     <link
         rel="stylesheet"
-        href="/static/styles.css"
+        href="/static/styles.css?v=2"
     >
 </head>
 <body>
@@ -124,6 +124,23 @@
                     No paper positions were recorded.
                 </p>
             </section>
+            <section class="chart-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h3>Realized P&amp;L by position</h3>
+                        <p>
+                            Final profit or loss after settlement and fees.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="position-pnl-chart" class="pnl-chart">
+                </div>
+
+                <p id="empty-pnl-chart" class="empty-table">
+                    P&amp;L will appear after positions settle.
+                </p>
+            </section>
             <div class="detail-grid">
                 <article class="panel">
                     <h3>Profit and loss</h3>
@@ -201,6 +218,6 @@
         </section>
     </main>
 
-    <script src="/static/dashboard.js"></script>
+    <script src="/static/dashboard.js?v=2"></script>
 </body>
 </html>
