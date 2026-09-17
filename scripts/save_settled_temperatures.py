@@ -128,15 +128,15 @@ async def save_recent_settlements() -> None:
                     retrieved_at=retrieved_at,
                 )
 
-                inserted = await save_temperature_settlement(
+                changed = await save_temperature_settlement(
                     session=session,
                     settlement=settlement,
                 )
 
                 result = (
-                    "saved"
-                    if inserted
-                    else "already existed"
+                    "saved or completed"
+                    if changed
+                    else "already complete"
                 )
 
                 print(
