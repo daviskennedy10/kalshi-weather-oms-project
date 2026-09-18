@@ -37,6 +37,12 @@ flowchart TD
 
 PostgreSQL stores forecasts, quotes, settlements, risk decisions, paper positions, OMS orders, and fills.
 
+## Dashboard
+
+![Weather Kalshi OMS performance dashboard](docs/dashboard.png)
+
+The read-only dashboard displays paper positions, model probabilities, net edges, settlement results, P&L, calibration metrics, and decision-save delay.
+
 ## Decision pipeline
 
 1. Retrieve a 64-member WeatherNext 2 ensemble forecast.
@@ -122,6 +128,25 @@ The analysis layer calculates:
 
 Historical calculations use only information available at the original decision time.
 
+## First forward paper-trading result
+
+On September 15, 2026, the system created four pretend positions for the September 16 Central Park temperature event using a forecast and market snapshot captured before the decision cutoff.
+
+Kalshi settled the event at 77°F.
+
+| Metric | Result |
+|---|---:|
+| Positions | 4 |
+| Winning positions | 1 |
+| Losing positions | 3 |
+| Total cost | $1.4102 |
+| Total payout | $1.0000 |
+| Total P&L | -$0.4102 |
+| Return on cost | -29.1% |
+| Brier score | 0.1622 |
+
+This single event validates the full technical pipeline. It is not enough data to evaluate profitability.
+
 ## Setup
 
 Requirements:
@@ -181,16 +206,11 @@ Activate the paper kill switch:
 python scripts/save_paper_positions.py YYYY-MM-DD --kill-switch
 ```
 
-Inspect pretend positions:
+
+Preview paper settlement:
 
 ```bash
-python scripts/inspect_paper_positions.py YYYY-MM-DD
-```
-
-Settle eligible pretend positions:
-
-```bash
-python scripts/settle_paper_positions.py
+python scripts/settle_paper_positions.py YYYY-MM-DD
 ```
 
 View performance:
@@ -218,9 +238,9 @@ Reconciliation is authenticated but read-only.
 | 5. Forecast-to-market comparison | Complete and verified with a real aligned snapshot |
 | 6. Order Management System | Complete within the no-order safety boundary |
 | 7. Position sizing | Complete |
-| 8. Paper trading | Implemented; forward runs are accumulating |
-| 9. Backtesting and measurements | Implemented; meaningful results require more samples |
-| 10. Dashboard and presentation | In progress |
+| 8. Paper trading | Complete; first full forward cycle settled |
+| 9. Backtesting and measurements | Complete; more samples are accumulating |
+| 10. Dashboard and presentation | Dashboard complete; presentation materials in progress |
 
 ## Current limitations
 
@@ -231,7 +251,7 @@ Reconciliation is authenticated but read-only.
 - Calibration metrics are not meaningful with very small samples.
 - Reconciliation reports differences but does not automatically repair them.
 - The event bus is in-process rather than durable.
-- No recruiter-facing dashboard exists yet.
+- The dashboard currently runs locally
 
 ## Engineering decisions
 
